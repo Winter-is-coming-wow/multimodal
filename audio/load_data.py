@@ -34,17 +34,18 @@ def data_aug(signal, snr_low=15, snr_high=30, nb_augmented=2):
 
 
 # 提取特征
-def mel_spectrogram(y, sr=16000, n_fft=512, win_length=256, hop_length=128, window='hamming', n_mels=128, fmax=4000):
+
+def mel_spectrogram(y, sr=16000, n_fft=512, win_length=256, hop_length=128, window='hamming', n_mels=128,fmax=4000):
     # Compute spectogram
     mel_spect = np.abs(librosa.stft(y, n_fft=n_fft, window=window, win_length=win_length, hop_length=hop_length)) ** 2
 
     # Compute mel spectrogram
-    mel_spect = librosa.feature.melspectrogram(S=mel_spect, sr=sr, n_mels=n_mels, fmax=fmax)
+    mel_spect = librosa.feature.melspectrogram(S=mel_spect, sr=sr, n_mels=n_mels,fmax=fmax)
 
     # Compute log-mel spectrogram
     mel_spect = librosa.power_to_db(mel_spect, ref=np.max)
-
     return mel_spect
+
 
 def data_loader():
     print("Import Data: START")
@@ -59,6 +60,9 @@ def data_loader():
     #audio data
     signals=[]
 
+    sample_rate=16000
+    max_pad_len = 49100
+
     keys=list(label_dict_ravdess.keys())
     for dir in os.listdir(file_path):
         for file in os.listdir(os.path.join(file_path,dir)):
@@ -68,17 +72,14 @@ def data_loader():
 
     #read audio files
     audio_index=0
-    for audio_file in filenames:
+    for audio_file in filenames[:10]:
         id=audio_file.split('\\')[-1][6:8]
         if id in keys:
             audio_index+=1
             # Read audio file
-            y, sr = librosa.load(os.path.join(file_path, dir, file))
+            y, sr = librosa.load(os.path.join(file_path, dir, file),sr=sample_rate)
             # Z-normalization
             y = zscore(y)
-
-            max_pad_len=3*sr
-
             if len(y) < max_pad_len:
                 y_padded = np.zeros(max_pad_len)
                 y_padded[:len(y)] = y
@@ -101,9 +102,9 @@ def data_loader():
     train_data,test_data,train_label,test_label=train_test_split(signals,labels,test_size=0.2,shuffle=False)
 
     #Train data augument
-    train_auged = list(map(data_aug, train_data))
-    train_auged=list(itertools.chain.from_iterable(train_auged))
+    train_auged = np.asarray(list(map(data_aug, train_data)))
 
+    train_auged=np.asarray([train_auged[i][j] for j in range(2) for i in range(len(train_auged))])
     #Build augmented lables
     train_auged_label=np.asarray(train_label*2)
     train_label = np.asarray(train_label)
@@ -118,10 +119,10 @@ def data_loader():
 
     #build test dataset
     x_test=np.asarray(list(map(mel_spectrogram, test_data)))
-    y_test=list(test_label)
-    print(x_train.shape,x_test.shape)
+    y_test=np.asarray(list(test_label))
+
     # Split spectrogram into frames
-    def frame(x, win_step=128, win_size=64):
+    def frame(x, win_step, win_size):
         nb_frames = 1 + int((x.shape[2] - win_size) / win_step)
         frames = np.zeros((x.shape[0], nb_frames, x.shape[1], win_size)).astype(np.float32)
         for t in range(nb_frames):
@@ -133,7 +134,7 @@ def data_loader():
     # Frame for TimeDistributed model
     X_train = frame(x_train, hop_ts, win_ts)
     X_test = frame(x_test, hop_ts, win_ts)
-
+    print(X_train.shape,X_test.shape)
     pickle.dump(X_train.astype(np.float16), open('../cache/X_train.p', 'wb'))
     pickle.dump(y_train, open('../cache/y_train.p', 'wb'))
     pickle.dump(X_test.astype(np.float16), open('../cache/X_test.p', 'wb'))
