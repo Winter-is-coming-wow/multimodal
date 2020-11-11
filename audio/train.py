@@ -15,6 +15,7 @@ from audio_model import analyser
 import warnings
 warnings.filterwarnings('ignore')
 
+
 def Train():
     #载入数据
     x_train=pickle.load(open('../cache/X_train.p','rb'))
@@ -34,14 +35,16 @@ def Train():
         loss=tf.keras.losses.sparse_categorical_crossentropy,
         metrics=tf.keras.metrics.sparse_categorical_accuracy
     )
-    net.summary()
-    best_model_save = ModelCheckpoint('../cache/best_model.ckpt',
+    best_model_save = ModelCheckpoint('../cache/best_model1.ckpt',
                                       save_best_only=True, monitor='val_sparse_categorical_accuracy', mode='max')
     early_stopping = EarlyStopping(monitor='val_sparse_categorical_accuracy', patience=30, verbose=1, mode='max')
+    reduce_lr = ReduceLROnPlateau('val_loss', factor=0.1,
+                                  patience=10,
+                                  verbose=1)
     history=net.fit(x_train,y_train,batch_size=32,epochs=100,validation_data=(x_test,y_test),
-                    callbacks=[early_stopping,best_model_save])
+                    callbacks=[early_stopping,reduce_lr,best_model_save])
 
-    net.save('../cache/1.h5')
+    net.save('../cache/audio.h5')
     #Loss Curves
     plt.figure(figsize=(25, 10))
     plt.subplot(1, 2, 1)

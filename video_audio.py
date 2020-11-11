@@ -1,9 +1,10 @@
 # -- coding: utf-8 --
 import librosa
 import pyaudio
-from multiprocessing import Process,Pipe,Queue
+from multiprocessing import Process,Event,Queue
 import struct as st
 import matplotlib.pyplot as plt
+from moviepy.editor import *
 import os
 import time
 import numpy as np
@@ -126,36 +127,33 @@ def predict(width, height, confidences, boxes, prob_threshold, iou_threshold=0.5
 
 def listen(channels,sample_rate,chunk,writer):
     p = pyaudio.PyAudio()
-    q=pyaudio.PyAudio()
     stream = p.open(format=pyaudio.paInt16,
                     channels=channels,
                     rate=sample_rate,
                     input=True,
                     frames_per_buffer=chunk  # pyaudio内置缓存区大小
                     )
-    out_stream=q.open(format=pyaudio.paInt16,
-                      channels=channels,
-                      rate=sample_rate,
-                      output=True
-                      )
     # Determine the timestamp of the start of the response interval
     print('* Start Recording *')
     stream.start_stream()
     # Record audio until timeout
     frames = []
+    slices=[]
     plt.figure(figsize=(8, 2))
     while True:
         # Record data audio data
         data = stream.read(chunk)
-        out_stream.write(data)
         slice = st.unpack(str(chunk) + 'h', data)
         slice = [i / 32768.0 for i in slice]
-        writer.put(slice)
+        slices.extend(slice)
+        if len(slices)>=chunk*2:
+            writer.put(slices.copy())
+            slices.clear()
         if len(frames) >= 48000:
             frames.clear()
         frames.extend(slice)
         plt.plot(range(len(frames)), frames)
-        plt.xlim(0, 50050)
+        plt.xlim(0, 50000)
         plt.ylim(-1.0, 1.0)
         plt.pause(0.01)
         plt.clf()
@@ -166,46 +164,70 @@ def listen(channels,sample_rate,chunk,writer):
     p.terminate()
     print('* End Recording * ')
 
-def draw(reader):
-    frames=[]
-    plt.figure(figsize=(15,5))
-    while True:
-        if len(frames)>50000:
-            frames.clear()
-        recv=reader.recv()
-        frames.extend(recv)
-        plt.plot(range(len(frames)),frames)
-        plt.xlim(0,50000)
-        plt.ylim(-1.0,1.0)
-        plt.pause(0.01)
-        plt.clf()
+def load_audio(filename,sr,chunk,writer,ev):
+    y,sr=librosa.load(filename,sr=sr)
+    L=0
+    q = pyaudio.PyAudio()
+    out_stream = q.open(format=pyaudio.paFloat32,
+                        channels=1,
+                        rate=16000,
+                        output=True
+                        )
+    slices=[]
+    ev.set()
+    while L+sr<=len(y):
+        slice=y[L:L+sr]
+        slices.extend(slice)
+        if len(slices)>=chunk*2:
+            writer.put(slices.copy())
+            slices.clear()
+        out_stream.write(st.pack(str(len(slice))+'f',*slice))
+        L+=sr
+        #time.sleep(1)
+    return
 
-def main(filepath):
+def main(filepath=None):
     ser=analyser('cache/1.h5') #语音情感识别模型
     fer=tf.keras.models.load_model('cache/vedio.h5') #人脸表情识别模型
     onnx_path = r'G:\demo\python\practice\Sentiment-Analysis-audio\audio_vedio\cache\ultra_light_320.onnx'
     ort_session = ort.InferenceSession(onnx_path)#人脸检测模型
     input_name = ort_session.get_inputs()[0].name
 
-    cap=cv.VideoCapture(filepath)
+    if filepath is None:
+        cap=cv.VideoCapture(0)
+    else:
+        video_=VideoFileClip(filepath)
+        audio_=video_.audio
+        temp_audio='cache/temp.wav'
+        audio_.write_audiofile(temp_audio)
+        cap=cv.VideoCapture(filepath)
 
     channels = 1
     sample_rate = 16000
     chunk = 16000
 
     mQueue = Queue()
-    subprocess = Process(target=listen, args=(channels, sample_rate, chunk, mQueue))
+    e=Event()
+    if filepath is None:
+        subprocess = Process(target=listen, args=(channels, sample_rate, chunk, mQueue))
+    else:
+        subprocess=Process(target=load_audio, args=(temp_audio, sample_rate, chunk, mQueue,e))
     subprocess.start()
+
     audio_predict=None
+    flag_e=True
     while True:
         if not mQueue.empty():
             msg=mQueue.get()
-            signal = ser.endpoint_detection(msg.copy())
-            if (len(signal) < 2000):
+            signal = ser.endpoint_detection(msg)
+            if (len(signal) < 12000):
                 continue
             else:
-                audio_predict=ser.predict(signal)[0]
+                audio_predict=ser.predict(msg)
+                print(time.ctime(),' : ',label_dict[np.argmax(audio_predict)])
         ret, frame = cap.read()
+        if filepath is None:
+            frame=cv.flip(frame,1)
         if frame is not None:
             h, w, _ = frame.shape
             # preprocess img acquired
@@ -222,15 +244,24 @@ def main(filepath):
             boxes = sorted(boxes, reverse=True, key=lambda x: (x[2] - x[0]) * (x[3] - x[1]))  # 按面积从小到大排序
             face_num = min(2, len(boxes))
             faces = []
+            if face_num<1:
+                cv.imshow('Video', frame)
+                continue
+            flag=False
             for i in range(face_num):
                 box = boxes[i]
                 x1, y1, x2, y2 = box
+                if x1<0 or y1<0 or x2<0 or y2<0:
+                    flag=True
+                    break
                 cv.rectangle(frame, (x1, y1), (x2, y2), (80, 18, 236), 2)
                 face_cliped = frame[y1:y2 + 1, x1:x2 + 1, :].copy()
                 gray = cv.cvtColor(face_cliped, cv.COLOR_RGB2GRAY)
                 resized = cv.resize(gray, (48, 48)).astype(np.float32) / 255.0
                 resized = np.expand_dims(resized, axis=-1)
                 faces.append(resized)
+            if flag:
+                continue
             faces = np.asarray(faces)
             emotion = fer.predict(faces)
             if audio_predict is not None:
@@ -240,8 +271,11 @@ def main(filepath):
             for i in range(face_num):
                 box = boxes[i]
                 x1, y1, x2, y2 = box
-                text = f"{emotions[i]}"
+                text = str(emotions[i])
                 cv.putText(frame, text, (x1 - 2, y1 - 2), font, 0.5, (255, 255, 255), 1)
+            if flag_e and filepath is not None:
+                flag_e=False
+                e.wait()
             cv.imshow('Video', frame)
 
         if cv.waitKey(1) & 0xFF == ord('q'):
@@ -252,5 +286,6 @@ def main(filepath):
 
 
 if __name__ == '__main__':
-    filepath = r'G:\demo\python\practice\Sentiment-Analysis-audio\audio_vedio\cache\test.avi'
+    #filepath = r'G:\demo\python\practice\Sentiment-Analysis-audio\audio_vedio\cache\test.avi'
+    filepath = r'G:\deeplearning\FER datasets\Raw\Video\Full\6Egk_28TtTM.mp4'
     main(filepath)

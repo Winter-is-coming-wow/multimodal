@@ -252,5 +252,7 @@ class analyser:
         #print(mel_spect.shape)
         mel_spect_ts = self.frame(mel_spect)
 
-        return self._model.predict(mel_spect_ts)[0]
+        ans=self._model.predict(mel_spect_ts)[0]
+
+        return ans
 
