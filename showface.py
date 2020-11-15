@@ -51,7 +51,7 @@ class Ui_MainWindow(object):
         self.toolButton_picture.setGeometry(QtCore.QRect(10, 280, 41, 41))
         self.toolButton_picture.setText("")
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap("vedio/images_test/图片.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(QtGui.QPixmap("vedio/images_test/image2.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.toolButton_picture.setIcon(icon)
         self.toolButton_picture.setIconSize(QtCore.QSize(50, 50))
         self.toolButton_picture.setObjectName("toolButton_picture")

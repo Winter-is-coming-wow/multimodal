@@ -232,6 +232,7 @@ class analyser:
         return frames
 
     def predict(self,y,sr=16000):
+
         chunk_size=sr*2
         y=np.array(y)
         y = zscore(y)

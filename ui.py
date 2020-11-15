@@ -151,13 +151,13 @@ class Mywindow(QMainWindow,Ui_MainWindow):
 
 
 class Mythread(QtCore.QThread):
-    hasans = QtCore.pyqtSignal('QVariantList')  # 将结果传到主线程
+    hasans = QtCore.pyqtSignal(list)  # 将结果传到主线程
     def __init__(self,cap,filepath=None):
         super().__init__()
         self.cap=cap
         self.analyzer_frame=frame_analyser()  #预测图片
         self.filepath=filepath
-        self.ser=analyser()  #预测语音
+        self.ser=analyser('cache/1.h5')  #预测语音
         self.audio_predict=[0]*7
     # def return_ans(self,pre):
     #     boxes=pre[0]
@@ -179,8 +179,8 @@ class Mythread(QtCore.QThread):
 
     def handle_audio(self,audio_slice):
         signal = self.ser.endpoint_detection(audio_slice)
-        if (len(signal) > 12000):
-            self.audio_predict = self.ser.predict(audio_slice)
+        if len(signal) > 12000:
+            self.audio_predict = self.ser.predict(audio_slice).tolist()
 
 
     def run(self):
@@ -199,7 +199,7 @@ class Mythread(QtCore.QThread):
                         audio_ans = 'None'
                     else:
                         audio_ans = label_dict[np.argmax(self.audio_predict)]
-                        self.audio_predict = [0] * 7
+                        #self.audio_predict = [0] * 7
                     frame_ans = label_dict[np.argmax(emotion[0])]
                     multimodal_ans = label_dict[np.argmax(multimodal)]
                     ans = [frame_ans, audio_ans, 'None', multimodal_ans]
@@ -237,7 +237,6 @@ class listen(QtCore.QThread):
         print('* Start Recording *')
         stream.start_stream()
         # Record audio until timeout
-        frames = []
         slices = []
         #plt.figure(figsize=(8, 2))
         while True:
@@ -271,6 +270,7 @@ class load_audio(QtCore.QThread):
     loadsignal = QtCore.pyqtSignal(list)
 
     def __init__(self):
+        super().__init__()
         self.filename='cache/temp.wav'
 
     def run(self):
