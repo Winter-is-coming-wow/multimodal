@@ -14,6 +14,12 @@
    <string>MainWindow</string>
   </property>
   <widget class="QWidget" name="centralwidget">
+   <property name="sizePolicy">
+    <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+     <horstretch>0</horstretch>
+     <verstretch>0</verstretch>
+    </sizepolicy>
+   </property>
    <widget class="QWidget" name="widget" native="true">
     <property name="geometry">
      <rect>
@@ -34,12 +40,13 @@
      </property>
      <property name="font">
       <font>
-       <family>Arial</family>
-       <pointsize>24</pointsize>
+       <family>Algerian</family>
+       <pointsize>20</pointsize>
+       <underline>true</underline>
       </font>
      </property>
      <property name="text">
-      <string>多模态情感识别系统</string>
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;&lt;span style=&quot; font-weight:600; color:#55aaff;&quot;&gt;多模态&lt;/span&gt;&lt;/p&gt;&lt;p align=&quot;center&quot;&gt;&lt;span style=&quot; font-weight:600; color:#55aaff;&quot;&gt;情感识别&lt;/span&gt;&lt;/p&gt;&lt;p align=&quot;center&quot;&gt;&lt;span style=&quot; font-weight:600; color:#55aaff;&quot;&gt;系统&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
      </property>
      <property name="textFormat">
       <enum>Qt::RichText</enum>
@@ -123,7 +130,7 @@
       <string/>
      </property>
      <property name="icon">
-      <iconset resource="../Emotion Recognition2/Emotion Recognition2.1/Emotion Recognition/image1.qrc">
+      <iconset>
        <normaloff>:/newPrefix/图片.png</normaloff>:/newPrefix/图片.png</iconset>
      </property>
      <property name="iconSize">
@@ -146,7 +153,7 @@
       <string/>
      </property>
      <property name="icon">
-      <iconset resource="../Emotion Recognition2/Emotion Recognition2.1/Emotion Recognition/image1.qrc">
+      <iconset>
        <normaloff>:/newPrefix/vedio.png</normaloff>:/newPrefix/vedio.png</iconset>
      </property>
      <property name="iconSize">
@@ -170,7 +177,7 @@
      <property name="geometry">
       <rect>
        <x>0</x>
-       <y>0</y>
+       <y>-10</y>
        <width>671</width>
        <height>521</height>
       </rect>
@@ -196,10 +203,16 @@
      <property name="geometry">
       <rect>
        <x>50</x>
-       <y>80</y>
-       <width>48</width>
-       <height>16</height>
+       <y>69</y>
+       <width>81</width>
+       <height>31</height>
       </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>华文琥珀</family>
+       <pointsize>10</pointsize>
+      </font>
      </property>
      <property name="text">
       <string>识别结果</string>
@@ -317,6 +330,14 @@
           <verstretch>0</verstretch>
          </sizepolicy>
         </property>
+        <property name="font">
+         <font>
+          <family>Arial Black</family>
+          <pointsize>9</pointsize>
+          <weight>75</weight>
+          <bold>true</bold>
+         </font>
+        </property>
         <property name="text">
          <string>视频模态</string>
         </property>
@@ -329,6 +350,12 @@
           <horstretch>1</horstretch>
           <verstretch>0</verstretch>
          </sizepolicy>
+        </property>
+        <property name="font">
+         <font>
+          <family>Arial</family>
+          <pointsize>10</pointsize>
+         </font>
         </property>
         <property name="text">
          <string>None</string>
@@ -355,6 +382,14 @@
           <verstretch>0</verstretch>
          </sizepolicy>
         </property>
+        <property name="font">
+         <font>
+          <family>Arial Black</family>
+          <pointsize>9</pointsize>
+          <weight>75</weight>
+          <bold>true</bold>
+         </font>
+        </property>
         <property name="text">
          <string>模态综合</string>
         </property>
@@ -367,6 +402,12 @@
           <horstretch>1</horstretch>
           <verstretch>0</verstretch>
          </sizepolicy>
+        </property>
+        <property name="font">
+         <font>
+          <family>Arial</family>
+          <pointsize>10</pointsize>
+         </font>
         </property>
         <property name="text">
          <string>None</string>
@@ -393,6 +434,14 @@
           <verstretch>0</verstretch>
          </sizepolicy>
         </property>
+        <property name="font">
+         <font>
+          <family>Arial Black</family>
+          <pointsize>9</pointsize>
+          <weight>75</weight>
+          <bold>true</bold>
+         </font>
+        </property>
         <property name="text">
          <string>文本模态</string>
         </property>
@@ -405,6 +454,12 @@
           <horstretch>1</horstretch>
           <verstretch>0</verstretch>
          </sizepolicy>
+        </property>
+        <property name="font">
+         <font>
+          <family>Arial</family>
+          <pointsize>10</pointsize>
+         </font>
         </property>
         <property name="text">
          <string>None</string>
@@ -431,6 +486,14 @@
           <verstretch>0</verstretch>
          </sizepolicy>
         </property>
+        <property name="font">
+         <font>
+          <family>Arial Black</family>
+          <pointsize>9</pointsize>
+          <weight>75</weight>
+          <bold>true</bold>
+         </font>
+        </property>
         <property name="text">
          <string>音频模态</string>
         </property>
@@ -444,8 +507,17 @@
           <verstretch>0</verstretch>
          </sizepolicy>
         </property>
+        <property name="font">
+         <font>
+          <family>Arial</family>
+          <pointsize>10</pointsize>
+         </font>
+        </property>
         <property name="text">
          <string>None</string>
+        </property>
+        <property name="scaledContents">
+         <bool>false</bool>
         </property>
        </widget>
       </item>
@@ -454,8 +526,6 @@
    </widget>
   </widget>
  </widget>
- <resources>
-  <include location="../Emotion Recognition2/Emotion Recognition2.1/Emotion Recognition/image1.qrc"/>
- </resources>
+ <resources/>
  <connections/>
 </ui>

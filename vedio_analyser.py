@@ -17,7 +17,7 @@ label_dict={0: 'angry', 1: 'disgust', 2: 'fear', 3: 'happy', 4: 'sad', 5: 'supri
 class frame_analyser():
     def __init__(self):
         self.model=tf.keras.models.load_model('cache/vedio.h5')
-        self.onnx_path = r'G:\demo\python\practice\Sentiment-Analysis-audio\audio_vedio\cache\ultra_light_320.onnx'
+        self.onnx_path = r'cache\ultra_light_320.onnx'
         self.ort_session = ort.InferenceSession(self.onnx_path)  # 人脸检测模型
         self.input_name = self.ort_session.get_inputs()[0].name
 
@@ -140,42 +140,67 @@ class frame_analyser():
         confidences, boxes = self.ort_session.run(None, {self.input_name: img})
         boxes, labels, probs = self.predict(w, h, confidences, boxes, 0.7)
         boxes = sorted(boxes, reverse=True, key=lambda x: (x[2] - x[0]) * (x[3] - x[1]))  # 按面积从小到大排序
-        if type==2: #如果是视频的一帧，则值选择面积最大的一个框
+        if type==2:
             face_num = min(1, len(boxes))
-        else:
-            face_num=len(boxes)
+            faces = []
+            if face_num >0:
+                for i in range(face_num):
 
-        faces = []
-        if face_num >0:
-            for i in range(face_num):
-                box = boxes[i]
-                x1, y1, x2, y2 = box
-                if x1 < 0 or y1 < 0 or x2 < 0 or y2 < 0:
-                    continue
-                cv.rectangle(frame, (x1, y1), (x2, y2), (80, 18, 236), 2)
-                face_cliped = frame[y1:y2 + 1, x1:x2 + 1, :].copy()
-                gray = cv.cvtColor(face_cliped, cv.COLOR_RGB2GRAY)
-                resized = cv.resize(gray, (48, 48)).astype(np.float32) / 255.0
-                resized = np.expand_dims(resized, axis=-1)
-                faces.append(resized)
-            if len(faces)>0:
-                faces = np.asarray(faces)
-                emotion = self.model.predict(faces)
-                emotions = [label_dict[e] for e in np.argmax(emotion, axis=1)]
-                font = cv.FONT_HERSHEY_DUPLEX
+                    box = boxes[i]
+                    x1, y1, x2, y2 = box
+                    if x1 < 0 or y1 < 0 or x2 < 0 or y2 < 0:
+                        continue
+                    cv.rectangle(frame, (x1, y1), (x2, y2), (80, 18, 236), 2)
+                    face_cliped = frame[y1:y2 + 1, x1:x2 + 1, :].copy()
+                    gray = cv.cvtColor(face_cliped, cv.COLOR_RGB2GRAY)
+                    resized = cv.resize(gray, (48, 48)).astype(np.float32) / 255.0
+                    resized = np.expand_dims(resized, axis=-1)
+                    faces.append(resized)
+                if len(faces)>0:
+                    faces = np.asarray(faces)
+                    emotion = self.model.predict(faces)
+                    return boxes,emotion
+                else:
+                    return None,None
+
+                # 调整画面大小与界面相适应
+                # frameClone = cv.resize(frame, (600, int(600/w*h)))
+                # # 在Qt界面中显示人脸
+                # show = cv.cvtColor(frameClone, cv.COLOR_BGR2RGB)
+                # showImage = QtGui.QImage(show.data, show.shape[1], show.shape[0], QtGui.QImage.Format_RGB888)
+                # label_face.setPixmap(QtGui.QPixmap.fromImage(showImage))
+            else:
+                return None,None
+
+        else:
+            face_num = len(boxes)
+            faces = []
+            if face_num > 0:
                 for i in range(face_num):
                     box = boxes[i]
                     x1, y1, x2, y2 = box
-                    text = str(emotions[i])
-                    cv.putText(frame, text, (x1 - 2, y1 - 2), font, 0.5, (255, 255, 255), 1)
-
-            if type==2:
-                return boxes,emotion
-
-            # 调整画面大小与界面相适应
-            frameClone = cv.resize(frame, (600, int(600/w*h)))
+                    if x1 < 0 or y1 < 0 or x2 < 0 or y2 < 0:
+                        continue
+                    cv.rectangle(frame, (x1, y1), (x2, y2), (80, 18, 236), 2)
+                    face_cliped = frame[y1:y2 + 1, x1:x2 + 1, :].copy()
+                    gray = cv.cvtColor(face_cliped, cv.COLOR_RGB2GRAY)
+                    resized = cv.resize(gray, (48, 48)).astype(np.float32) / 255.0
+                    resized = np.expand_dims(resized, axis=-1)
+                    faces.append(resized)
+                if len(faces) > 0:
+                    faces = np.asarray(faces)
+                    emotion = self.model.predict(faces)
+                    emotions = [label_dict[e] for e in np.argmax(emotion, axis=1)]
+                    font = cv.FONT_HERSHEY_DUPLEX
+                    for i in range(face_num):
+                        box = boxes[i]
+                        x1, y1, x2, y2 = box
+                        text = str(emotions[i])
+                        cv.putText(frame, text, (x1 - 2, y1 - 2), font, 0.5, (255, 255, 255), 1)
+            frameClone = cv.resize(frame, (600, int(600 / w * h)))
             # 在Qt界面中显示人脸
             show = cv.cvtColor(frameClone, cv.COLOR_BGR2RGB)
             showImage = QtGui.QImage(show.data, show.shape[1], show.shape[0], QtGui.QImage.Format_RGB888)
             label_face.setPixmap(QtGui.QPixmap.fromImage(showImage))
+
 

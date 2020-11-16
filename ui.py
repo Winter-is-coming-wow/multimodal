@@ -54,40 +54,50 @@ class Mywindow(QMainWindow,Ui_MainWindow):
         self.toolButton_picture.clicked.connect(self.on_toolbutton_picture_click)
         self.toolButton_video.clicked.connect(self.on_toolbutton_video_click)
         self.timer.timeout.connect(self.showtime)
+        self.thread_camera.hasans.connect(self.show_ans)
         self.thread_listen.sinsignal.connect(self.thread_camera.handle_audio)
 
 
 
     def on_pushbutton_carema_click(self):
         if self.thread_video!=None:
-            self.thread_video.terminate()
+            self.cap2.release()
+            if self.thread_video.isRunning():
+                self.thread_video.terminate()
+                self.thread_load.terminate()
 
-        if self.cap.isOpened():
-            self.cap.release()
+        if self.cap.isOpened() or self.thread_camera.isRunning():
+            self.thread_camera.terminate()
+            self.thread_listen.terminate()
+
+        flag=self.cap.open(self.CAM_NUM)
+        if not flag:
+            msg = QtWidgets.QMessageBox.warning(self.centralwidget, u"Warning",
+                                                u"请检测相机与电脑是否连接正确！ ",
+                                                buttons=QtWidgets.QMessageBox.Ok,
+                                                defaultButton=QtWidgets.QMessageBox.Ok)
         else:
-            flag=self.cap.open(self.CAM_NUM)
-            if not flag:
-                msg = QtWidgets.QMessageBox.warning(self.centralwidget, u"Warning",
-                                                    u"请检测相机与电脑是否连接正确！ ",
-                                                    buttons=QtWidgets.QMessageBox.Ok,
-                                                    defaultButton=QtWidgets.QMessageBox.Ok)
-            else:
-                self.reset_ui()
-                #准备运行识别程序
-                QtWidgets.QApplication.processEvents()
-                # 对于执行很耗时的程序来说，由于PyQt需要等待程序执行完毕才能进行下一步，这个过程表现在界面上就是卡顿，
-                # 而如果需要执行这个耗时程序时不断的刷新界面。那么就可以使用QApplication.processEvents()，
-                # 那么就可以一边执行耗时程序，一边刷新界面的功能，给人的感觉就是程序运行很流畅，因此QApplicationEvents（）的使用方法就是，
-                # 在主函数执行耗时操作的地方，加入QApplication.processEvents()
-                self.label_show.setText('实时摄像已开启')
-                self.thread_camera.start()
-                self.thread_listen.start()
+            self.reset_ui()
+            #准备运行识别程序
+            QtWidgets.QApplication.processEvents()
+            # 对于执行很耗时的程序来说，由于PyQt需要等待程序执行完毕才能进行下一步，这个过程表现在界面上就是卡顿，
+            # 而如果需要执行这个耗时程序时不断的刷新界面。那么就可以使用QApplication.processEvents()，
+            # 那么就可以一边执行耗时程序，一边刷新界面的功能，给人的感觉就是程序运行很流畅，因此QApplicationEvents（）的使用方法就是，
+            # 在主函数执行耗时操作的地方，加入QApplication.processEvents()
+            self.label_show.setText('实时摄像已开启')
+            self.thread_camera.start()
+            self.thread_listen.start()
 
     def on_toolbutton_picture_click(self):
         if self.cap2!=None:
             self.cap2.release()
-        if self.cap.isOpened():
+            if self.thread_video.isRunning():
+                self.thread_video.terminate()
+                self.thread_load.terminate()
+        if self.thread_camera.isRunning():
             self.cap.release()
+            self.thread_camera.terminate()
+            self.thread_listen.terminate()
         self.reset_ui()
         fileName_choose, filetype = QFileDialog.getOpenFileName(
             self.centralwidget, "选取图片文件",
@@ -96,7 +106,6 @@ class Mywindow(QMainWindow,Ui_MainWindow):
         self.path = fileName_choose  # 保存路径
         if fileName_choose != '':
             self.lineEdit_image.setText(fileName_choose + '文件已选中')
-            QtWidgets.QApplication.processEvents()
             image = cv.imread(fileName_choose)  # 读取选择的图片
             # 计时并开始模型预测
             QtWidgets.QApplication.processEvents()
@@ -105,10 +114,14 @@ class Mywindow(QMainWindow,Ui_MainWindow):
 
     def on_toolbutton_video_click(self):
         if self.thread_camera.isRunning():
+            self.cap.release()
             self.thread_camera.terminate()
+            self.thread_listen.terminate()
         # 界面处理
         if self.cap2!=None:
             self.cap2.release()
+            self.thread_video.terminate()
+            self.thread_load.terminate()
 
         fileName_choose, filetype = QFileDialog.getOpenFileName(
             self.centralwidget, "选取视频文件",
@@ -133,19 +146,22 @@ class Mywindow(QMainWindow,Ui_MainWindow):
         self.label_time.setText(time_display)
 
     def show_ans(self,answer):
+        QtWidgets.QApplication.processEvents()
         ans=answer[0]
         frame=answer[1]
-
-        self.label_video.setText(ans[0])
-        self.label_audio.setText(ans[1])
-        self.label_text.setText(ans[2])
-        self.label_multimodal.setText(ans[3])
+        if ans !=None:
+            self.label_video.setText(ans[0])
+            self.label_audio.setText(ans[1])
+            self.label_text.setText(ans[2])
+            self.label_multimodal.setText(ans[3])
         h,w=frame.shape[:2]
         frameClone = cv.resize(frame, (600, int(600 / w * h)))
         # 在Qt界面中显示人脸
         show = cv.cvtColor(frameClone, cv.COLOR_BGR2RGB)
         showImage = QtGui.QImage(show.data, show.shape[1], show.shape[0], QtGui.QImage.Format_RGB888)
         self.label_show.setPixmap(QtGui.QPixmap.fromImage(showImage))
+
+
 
 
 
@@ -192,7 +208,9 @@ class Mythread(QtCore.QThread):
         while True:
             ret,frame=self.cap.read()
             if ret:
-                boxes,emotion=self.analyzer_frame.predictor(frame.copy(),type=2)
+                if self.filepath == None:
+                    frame = cv.flip(frame, 1)
+                boxes,emotion=self.analyzer_frame.predictor(frame.copy())
                 if boxes!=None:
                     multimodal = emotion[0] + self.audio_predict
                     if self.audio_predict == [0] * 7:
@@ -204,17 +222,20 @@ class Mythread(QtCore.QThread):
                     multimodal_ans = label_dict[np.argmax(multimodal)]
                     ans = [frame_ans, audio_ans, 'None', multimodal_ans]
 
-                face_num = min(1, len(boxes))
+                    face_num = min(1, len(boxes))
 
-                if face_num > 0:
-                    font = cv.FONT_HERSHEY_DUPLEX
-                    for i in range(face_num):
-                        box = boxes[i]
-                        x1, y1, x2, y2 = box
-                        cv.rectangle(frame, (x1, y1), (x2, y2), (80, 18, 236), 2)
-                        text = str(multimodal_ans)
-                        cv.putText(frame, text, (x1 - 2, y1 - 2), font, 0.5, (255, 255, 255), 1)
-                self.hasans.emit([ans,frame])
+                    if face_num > 0:
+                        font = cv.FONT_HERSHEY_DUPLEX
+                        for i in range(face_num):
+                            box = boxes[i]
+                            x1, y1, x2, y2 = box
+                            cv.rectangle(frame, (x1, y1), (x2, y2), (80, 18, 236), 2)
+                            text = str(multimodal_ans)
+                            cv.putText(frame, text, (x1 - 2, y1 - 2), font, 0.5, (255, 255, 255), 1)
+                    self.hasans.emit([ans,frame])
+
+                else:
+                    self.hasans.emit([None,frame])
 
 
 
