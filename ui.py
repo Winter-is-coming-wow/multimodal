@@ -163,9 +163,6 @@ class Mywindow(QMainWindow,Ui_MainWindow):
 
 
 
-
-
-
 class Mythread(QtCore.QThread):
     hasans = QtCore.pyqtSignal(list)  # 将结果传到主线程
     def __init__(self,cap,filepath=None):
@@ -173,7 +170,7 @@ class Mythread(QtCore.QThread):
         self.cap=cap
         self.analyzer_frame=frame_analyser()  #预测图片
         self.filepath=filepath
-        self.ser=analyser('cache/1.h5')  #预测语音
+        self.ser=analyser('cache/1_audio.h5')  #预测语音
         self.audio_predict=[0]*7
     # def return_ans(self,pre):
     #     boxes=pre[0]
@@ -236,9 +233,6 @@ class Mythread(QtCore.QThread):
 
                 else:
                     self.hasans.emit([None,frame])
-
-
-
 
 
 class listen(QtCore.QThread):
