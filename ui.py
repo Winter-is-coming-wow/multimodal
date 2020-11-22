@@ -43,10 +43,9 @@ class Mywindow(QMainWindow,Ui_MainWindow):
         self.thread_video=None
         self.thread_camera=Mythread(self.cap)
         self.thread_listen=listen()
-        self.thread_load=load_audio(self.e)
+        self.thread_load=load_audio()
 
         self.image_analyser=frame_analyser()#预测图片
-
 
         self.slots_init()
 
@@ -114,6 +113,7 @@ class Mywindow(QMainWindow,Ui_MainWindow):
         self.path = fileName_choose  # 保存路径
         if fileName_choose != '':
             self.lineEdit_image.setText(fileName_choose + '文件已选中')
+            QtWidgets.QApplication.processEvents()
             image = cv.imread(fileName_choose)  # 读取选择的图片
             # 计时并开始模型预测
             QtWidgets.QApplication.processEvents()
@@ -269,6 +269,7 @@ class listen(QtCore.QThread):
         stream.start_stream()
         # Record audio until timeout
         slices = []
+        #plt.figure(figsize=(8, 2))
         while True:
             # Record data audio data
             data = stream.read(chunk)

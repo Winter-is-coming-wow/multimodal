@@ -1,24 +1,27 @@
 # -- coding: utf-8 --
-import librosa
-import pyaudio
-from multiprocessing import Process,Event,Queue
 import struct as st
-import matplotlib.pyplot as plt
-from moviepy.editor import *
-import os
 import time
+from multiprocessing import Process, Event, Queue
+
+import cv2 as cv
+import librosa
+import matplotlib.pyplot as plt
 import numpy as np
 import onnxruntime as ort
-from audio_model import analyser
+import pyaudio
 import tensorflow as tf
-import cv2 as cv
+from moviepy.editor import *
 from tensorflow.compat.v1 import ConfigProto
 from tensorflow.compat.v1 import InteractiveSession
+
+from audio_model import analyser
+
 config = ConfigProto()
 config.gpu_options.allow_growth = True
 session = InteractiveSession(config=config)
 
-label_dict={0: 'angry', 1: 'disgust', 2: 'fear', 3: 'happy', 4: 'sad', 5: 'suprised', 6: 'normal'}
+label_dict = {0: 'angry', 1: 'disgust', 2: 'fear', 3: 'happy', 4: 'sad', 5: 'suprised', 6: 'normal'}
+
 
 def area_of(left_top, right_bottom):
     """
@@ -31,6 +34,7 @@ def area_of(left_top, right_bottom):
     """
     hw = np.clip(right_bottom - left_top, 0.0, None)
     return hw[..., 0] * hw[..., 1]
+
 
 def iou_of(boxes0, boxes1, eps=1e-5):
     """
@@ -49,6 +53,7 @@ def iou_of(boxes0, boxes1, eps=1e-5):
     area0 = area_of(boxes0[..., :2], boxes0[..., 2:])
     area1 = area_of(boxes1[..., :2], boxes1[..., 2:])
     return overlap_area / (area0 + area1 - overlap_area + eps)
+
 
 def hard_nms(box_scores, iou_threshold, top_k=-1, candidate_size=200):
     """
@@ -83,6 +88,7 @@ def hard_nms(box_scores, iou_threshold, top_k=-1, candidate_size=200):
 
     return box_scores[picked, :]
 
+
 def predict(width, height, confidences, boxes, prob_threshold, iou_threshold=0.5, top_k=-1):
     """
     Select boxes that contain human faces
@@ -111,9 +117,9 @@ def predict(width, height, confidences, boxes, prob_threshold, iou_threshold=0.5
         subset_boxes = boxes[mask, :]
         box_probs = np.concatenate([subset_boxes, probs.reshape(-1, 1)], axis=1)
         box_probs = hard_nms(box_probs,
-           iou_threshold=iou_threshold,
-           top_k=top_k,
-           )
+                             iou_threshold=iou_threshold,
+                             top_k=top_k,
+                             )
         picked_box_probs.append(box_probs)
         picked_labels.extend([class_index] * box_probs.shape[0])
     if not picked_box_probs:
@@ -125,7 +131,8 @@ def predict(width, height, confidences, boxes, prob_threshold, iou_threshold=0.5
     picked_box_probs[:, 3] *= height
     return picked_box_probs[:, :4].astype(np.int32), np.array(picked_labels), picked_box_probs[:, 4]
 
-def listen(channels,sample_rate,chunk,writer):
+
+def listen(channels, sample_rate, chunk, writer):
     p = pyaudio.PyAudio()
     stream = p.open(format=pyaudio.paInt16,
                     channels=channels,
@@ -138,7 +145,7 @@ def listen(channels,sample_rate,chunk,writer):
     stream.start_stream()
     # Record audio until timeout
     frames = []
-    slices=[]
+    slices = []
     plt.figure(figsize=(8, 2))
     while True:
         # Record data audio data
@@ -146,7 +153,7 @@ def listen(channels,sample_rate,chunk,writer):
         slice = st.unpack(str(chunk) + 'h', data)
         slice = [i / 32768.0 for i in slice]
         slices.extend(slice)
-        if len(slices)>=chunk*2:
+        if len(slices) >= chunk * 2:
             writer.put(slices.copy())
             slices.clear()
         if len(frames) >= 48000:
@@ -164,70 +171,72 @@ def listen(channels,sample_rate,chunk,writer):
     p.terminate()
     print('* End Recording * ')
 
-def load_audio(filename,sr,chunk,writer,ev):
-    y,sr=librosa.load(filename,sr=sr)
-    L=0
+
+def load_audio(filename, sr, chunk, writer, ev):
+    y, sr = librosa.load(filename, sr=sr)
+    L = 0
     q = pyaudio.PyAudio()
     out_stream = q.open(format=pyaudio.paFloat32,
                         channels=1,
                         rate=16000,
                         output=True
                         )
-    slices=[]
+    slices = []
     ev.set()
-    while L+sr<=len(y):
-        slice=y[L:L+sr]
+    while L + sr <= len(y):
+        slice = y[L:L + sr]
         slices.extend(slice)
-        if len(slices)>=chunk*2:
+        if len(slices) >= chunk * 2:
             writer.put(slices.copy())
             slices.clear()
-        out_stream.write(st.pack(str(len(slice))+'f',*slice))
-        L+=sr
-        #time.sleep(1)
+        out_stream.write(st.pack(str(len(slice)) + 'f', *slice))
+        L += sr
+        # time.sleep(1)
     return
 
+
 def main(filepath=None):
-    ser=analyser('cache/1.h5') #语音情感识别模型
-    fer=tf.keras.models.load_model('cache/vedio.h5') #人脸表情识别模型
-    onnx_path = r'G:\demo\python\practice\Sentiment-Analysis-audio\audio_vedio\cache\ultra_light_320.onnx'
-    ort_session = ort.InferenceSession(onnx_path)#人脸检测模型
+    ser = analyser('cache/1_audio.h5')  # 语音情感识别模型
+    fer = tf.keras.models.load_model('cache/vedio.h5')  # 人脸表情识别模型
+    onnx_path = r'cache\ultra_light_320.onnx'
+    ort_session = ort.InferenceSession(onnx_path)  # 人脸检测模型
     input_name = ort_session.get_inputs()[0].name
 
     if filepath is None:
-        cap=cv.VideoCapture(0)
+        cap = cv.VideoCapture(0)
     else:
-        video_=VideoFileClip(filepath)
-        audio_=video_.audio
-        temp_audio='cache/temp.wav'
+        video_ = VideoFileClip(filepath)
+        audio_ = video_.audio
+        temp_audio = 'cache/temp1.wav'
         audio_.write_audiofile(temp_audio)
-        cap=cv.VideoCapture(filepath)
+        cap = cv.VideoCapture(filepath)
 
     channels = 1
     sample_rate = 16000
     chunk = 16000
 
     mQueue = Queue()
-    e=Event()
+    e = Event()
     if filepath is None:
         subprocess = Process(target=listen, args=(channels, sample_rate, chunk, mQueue))
     else:
-        subprocess=Process(target=load_audio, args=(temp_audio, sample_rate, chunk, mQueue,e))
+        subprocess = Process(target=load_audio, args=(temp_audio, sample_rate, chunk, mQueue, e))
     subprocess.start()
 
-    audio_predict=None
-    flag_e=True
+    audio_predict = None
+    flag_e = True
     while True:
         if not mQueue.empty():
-            msg=mQueue.get()
+            msg = mQueue.get()
             signal = ser.endpoint_detection(msg)
             if (len(signal) < 12000):
                 continue
             else:
-                audio_predict=ser.predict(msg)
-                print(time.ctime(),' : ',label_dict[np.argmax(audio_predict)])
+                audio_predict = ser.predict(msg)
+                print(time.ctime(), ' : ', label_dict[np.argmax(audio_predict)])
         ret, frame = cap.read()
         if filepath is None:
-            frame=cv.flip(frame,1)
+            frame = cv.flip(frame, 1)
         if frame is not None:
             h, w, _ = frame.shape
             # preprocess img acquired
@@ -244,15 +253,15 @@ def main(filepath=None):
             boxes = sorted(boxes, reverse=True, key=lambda x: (x[2] - x[0]) * (x[3] - x[1]))  # 按面积从小到大排序
             face_num = min(2, len(boxes))
             faces = []
-            if face_num<1:
+            if face_num < 1:
                 cv.imshow('Video', frame)
                 continue
-            flag=False
+            flag = False
             for i in range(face_num):
                 box = boxes[i]
                 x1, y1, x2, y2 = box
-                if x1<0 or y1<0 or x2<0 or y2<0:
-                    flag=True
+                if x1 < 0 or y1 < 0 or x2 < 0 or y2 < 0:
+                    flag = True
                     break
                 cv.rectangle(frame, (x1, y1), (x2, y2), (80, 18, 236), 2)
                 face_cliped = frame[y1:y2 + 1, x1:x2 + 1, :].copy()
@@ -265,8 +274,8 @@ def main(filepath=None):
             faces = np.asarray(faces)
             emotion = fer.predict(faces)
             if audio_predict is not None:
-                emotion[0]+=audio_predict
-            emotions=[ label_dict[e] for e in np.argmax(emotion,axis=1) ]
+                emotion[0] += audio_predict
+            emotions = [label_dict[e] for e in np.argmax(emotion, axis=1)]
             font = cv.FONT_HERSHEY_DUPLEX
             for i in range(face_num):
                 box = boxes[i]
@@ -274,7 +283,7 @@ def main(filepath=None):
                 text = str(emotions[i])
                 cv.putText(frame, text, (x1 - 2, y1 - 2), font, 0.5, (255, 255, 255), 1)
             if flag_e and filepath is not None:
-                flag_e=False
+                flag_e = False
                 e.wait()
             cv.imshow('Video', frame)
 
@@ -284,8 +293,7 @@ def main(filepath=None):
     cv.destroyAllWindows()
 
 
-
 if __name__ == '__main__':
-    #filepath = r'G:\demo\python\practice\Sentiment-Analysis-audio\audio_vedio\cache\test.avi'
-    filepath = r'G:\deeplearning\FER datasets\Raw\Video\Full\6Egk_28TtTM.mp4'
+    filepath = r'G:\demo\python\practice\Sentiment-Analysis-audio\audio_vedio\cache\test.avi'
+    filepath = r'vedio/img_test/test.avi'
     main(filepath)
